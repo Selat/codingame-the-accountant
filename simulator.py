@@ -32,7 +32,7 @@ class Enemy(Unit):
     def move(self, world):
         min_dist = 10 ** 9
         target = None
-        for p in world.get_data_points():
+        for p in world.data_points.values():
             cur_dist = (p.x - self.x) * (p.x - self.x) + (p.y - self.y) * (p.y - self.y)
             if cur_dist < min_dist:
                 min_dist = cur_dist
@@ -69,17 +69,17 @@ class World:
         self.bot = bot
         self.wolff = Wolff(1100, 1200)
         # Test 29
-        self.data_points = [DataPoint(5000, 5000), DataPoint(10000, 5000), DataPoint(5000, 1900), DataPoint(1000, 4000), DataPoint(1000, 8999)]
-        self.enemies = [Enemy(10500, 8000, 10), Enemy(15000, 0, 42), Enemy(14000, 0, 42)]
+        self.data_points = dict(enumerate([DataPoint(5000, 5000), DataPoint(10000, 5000), DataPoint(5000, 1900), DataPoint(1000, 4000), DataPoint(1000, 8999)]))
+        self.enemies = dict(enumerate([Enemy(10500, 8000, 10), Enemy(15000, 0, 42), Enemy(14000, 0, 42)]))
         self.score = len(self.data_points) * World.DATA_POINT_SCORE
         self.is_wolff_killed = False
-        self.initial_live_points_sum = sum([e.life_points for e in self.enemies])
+        self.initial_live_points_sum = sum([e.life_points for e in self.enemies.values()])
         self.shots_num = 0
 
     def move(self):
         self.cur_turn = self.bot.make_turn(self)
         # 1. Enemies move towards their targets.
-        for e in self.enemies:
+        for e in self.enemies.values():
             e.move(self)
 
         # 2. If a MOVE command was given, Wolff moves towards his target.
@@ -99,9 +99,10 @@ class World:
             self.wolff.shoot(self, self.cur_turn[1])
 
         # 5. Enemies with zero life points are removed from play.
-        new_enemies = [e for e in self.enemies if e.life_points > 0]
-        self.score += (len(self.enemies) - len(new_enemies)) * 10
-        self.enemies = new_enemies
+        killed_ids = [id for id, e in self.enemies.items() if e.life_points == 0]
+        for id in killed_ids:
+            del self.enemies[id]
+            self.score += 10
         if not self.enemies:
             self.calculate_bonus()
 
@@ -112,27 +113,24 @@ class World:
 
     def check_wolff_killed(self):
         wx, wy = self.wolff.x, self.wolff.y
-        for e in self.enemies:
+        for e in self.enemies.values():
             if (e.x - wx) * (e.x - wx) + (e.y - wy) * (e.y - wy) <= Enemy.RANGE * Enemy.RANGE:
                 print(e.x, e.y, wx, wy)
                 self.is_wolff_killed = True
                 return
 
-    def get_data_points(self):
-        return self.data_points
-
     def game_over(self):
         return not self.data_points or not self.enemies or self.is_wolff_killed
 
     def collect_data_points(self):
-        new_data_points = []
-        for p in self.data_points:
+        new_data_points = {}
+        for id, p in self.data_points.items():
             is_taken = False
-            for e in self.enemies:
+            for e in self.enemies.values():
                 if e.x == p.x and e.y == p.y:
                     is_taken = True
             if not is_taken:
-                new_data_points.append(p)
+                new_data_points[id] = p
             else:
                 self.score -= World.DATA_POINT_SCORE
         self.data_points = new_data_points
@@ -164,7 +162,7 @@ class Bot:
         elif cmd == 'SHOOT':
             assert len(turn) == 2
             target_id = int(turn[1])
-            assert 0 <= target_id < len(world.enemies)
+            assert target_id in world.enemies
             turn[1] = target_id
             return turn
         else:
@@ -174,10 +172,10 @@ class Bot:
         return ('{} {}\n'.format(world.wolff.x, world.wolff.y)
              + Bot.serialize_data_points(world) + Bot.serialize_enemies(world))
     def serialize_data_points(world):
-        return '\n'.join([str(len(world.data_points))] + [' '.join((str(i), str(p.x), str(p.y))) for i, p in enumerate(world.data_points)]) + '\n'
+        return '\n'.join([str(len(world.data_points))] + [' '.join((str(i), str(p.x), str(p.y))) for i, p in world.data_points.items()]) + '\n'
 
     def serialize_enemies(world):
-        return '\n'.join([str(len(world.enemies))] + [' '.join((str(i), str(e.x), str(e.y), str(e.life_points))) for i, e in enumerate(world.enemies)]) + '\n'
+        return '\n'.join([str(len(world.enemies))] + [' '.join((str(i), str(e.x), str(e.y), str(e.life_points))) for i, e in world.enemies.items()]) + '\n'
 
 world = World(Bot('./bot'))
 while not world.game_over():
