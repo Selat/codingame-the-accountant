@@ -4,11 +4,13 @@ import time
 import math
 import subprocess
 import sys
+import os
 
 class Unit:
-    def __init__(self, x, y, speed):
-        self.x = x
-        self.y = y
+    def __init__(self, speed):
+        self.x = 0
+        self.y = 0
+        self.speed = speed
     def move(self, x, y):
         d = (x - self.x) * (x - self.x) + (y - self.y) * (y - self.y)
         if d <= self.SPEED * self.SPEED:
@@ -25,9 +27,9 @@ class Unit:
 class Enemy(Unit):
     SPEED = 500
     RANGE = 2000
-    def __init__(self, x, y, life_points):
-        Unit.__init__(self, x, y, Enemy.SPEED)
-        self.life_points = life_points
+    def __init__(self):
+        Unit.__init__(self, Enemy.SPEED)
+        self.life_points = 0
 
     def move(self, world):
         min_dist = 10 ** 9
@@ -43,37 +45,72 @@ class Enemy(Unit):
     def damage(self, damage):
         self.life_points = max(self.life_points - damage, 0)
 
+    def serialize(self):
+        return '{} {} {} {}'.format(self.id, self.x, self.y, self.life_points)
+
+    def deserialize(self, s):
+        data = s.split(' ')
+        assert(len(data) == 4)
+        self.id = int(data[0])
+        self.x = int(data[1])
+        self.y = int(data[2])
+        self.life_points = int(data[3])
+        assert 0 <= self.x < World.WIDTH and 0 <= self.y < World.HEIGHT
+        assert 1 <= self.life_points < World.MAX_LIFE_POINTS
+
 class Wolff(Unit):
     SPEED = 1000
-    def __init__(self, x, y):
-        Unit.__init__(self, x, y, Wolff.SPEED)
+    def __init__(self):
+        Unit.__init__(self, Wolff.SPEED)
     def move(self, x, y):
         Unit.move(self, x, y)
+
     def shoot(self, world, target_id):
         enemy = world.enemies[target_id]
         dist = math.sqrt((self.x - enemy.x) * (self.x - enemy.x) + (self.y - enemy.y) * (self.y - enemy.y))
         damage = round(125000 / (dist ** 1.2))
         enemy.damage(damage)
 
+    def serialize(self):
+        return '{} {}'.format(self.x, self.y)
+
+    def deserialize(self, s):
+        data = s.split(' ')
+        assert(len(data) == 2)
+        self.x = int(data[0])
+        self.y = int(data[1])
+        assert 0 <= self.x < World.WIDTH and 0 <= self.y < World.HEIGHT
+
 class DataPoint:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
+    def __init__(self):
+        self.x = 0
+        self.y = 0
+
+    def serialize(self):
+        return '{} {} {}'.format(self.id, self.x, self.y)
+
+    def deserialize(self, s):
+        data = s.split(' ')
+        assert len(data) == 3
+        self.id = int(data[0])
+        self.x = int(data[1])
+        self.y = int(data[2])
+        assert 0 <= self.x < World.WIDTH and 0 <= self.y < World.HEIGHT
 
 class World:
     WIDTH = 16000
     HEIGHT = 9000
     DATA_POINT_SCORE = 100
+    MAX_LIFE_POINTS = 150
 
     def __init__(self, bot):
         self.bot = bot
-        self.wolff = Wolff(1100, 1200)
-        # Test 29
-        self.data_points = dict(enumerate([DataPoint(5000, 5000), DataPoint(10000, 5000), DataPoint(5000, 1900), DataPoint(1000, 4000), DataPoint(1000, 8999)]))
-        self.enemies = dict(enumerate([Enemy(10500, 8000, 10), Enemy(15000, 0, 42), Enemy(14000, 0, 42)]))
-        self.score = len(self.data_points) * World.DATA_POINT_SCORE
+        self.wolff = Wolff()
+        self.data_points = {}
+        self.enemies = {}
+        self.score = 0
         self.is_wolff_killed = False
-        self.initial_live_points_sum = sum([e.life_points for e in self.enemies.values()])
+        self.initial_life_points_sum = 0
         self.shots_num = 0
 
     def move(self):
@@ -106,16 +143,14 @@ class World:
         if not self.enemies:
             self.calculate_bonus()
 
-        #print([(e.x, e.y, e.life_points) for e in self.enemies])
-
         # 6. Enemies collect data points they share coordinates with.
         self.collect_data_points()
 
     def check_wolff_killed(self):
         wx, wy = self.wolff.x, self.wolff.y
         for e in self.enemies.values():
-            if (e.x - wx) * (e.x - wx) + (e.y - wy) * (e.y - wy) <= Enemy.RANGE * Enemy.RANGE:
-                print(e.x, e.y, wx, wy)
+            d = (e.x - wx) * (e.x - wx) + (e.y - wy) * (e.y - wy)
+            if d <= Enemy.RANGE * Enemy.RANGE:
                 self.is_wolff_killed = True
                 return
 
@@ -137,17 +172,46 @@ class World:
 
     def calculate_bonus(self):
         self.score += (len(self.data_points) *
-            max(0, self.initial_live_points_sum - 3 * self.shots_num) * 3)
+            max(0, self.initial_life_points_sum - 3 * self.shots_num) * 3)
+
+    def serialize(self):
+        # World state should end with a newline, otherwise bot hangs
+        return '\n'.join([self.wolff.serialize(),
+                          self.serialize_entities(self.data_points),
+                          self.serialize_entities(self.enemies), ''])
+
+    def serialize_entities(self, entities):
+        return '\n'.join([str(len(entities))] +
+                         [e.serialize() for e in entities.values()])
+
+    def deserialize(self, input):
+        self.__init__(self.bot)
+        self.wolff.deserialize(input.readline())
+        data_points_num = int(input.readline())
+        for i in range(0, data_points_num):
+            dp = DataPoint()
+            dp.deserialize(input.readline())
+            self.data_points[dp.id] = dp
+        enemies_num = int(input.readline())
+        for i in range(0, enemies_num):
+            enemy = Enemy()
+            enemy.deserialize(input.readline())
+            self.enemies[enemy.id] = enemy
+        self.score = len(self.data_points) * World.DATA_POINT_SCORE
+        self.initial_life_points_sum = sum(
+            [e.life_points for e in self.enemies.values()])
 
 # Provides an interface for an actual bot written in C++.
 class Bot:
     def __init__(self, prog_name):
-        self.proc = subprocess.Popen(prog_name, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        self.proc = subprocess.Popen(prog_name, shell=True,
+                                     stdin=subprocess.PIPE,
+                                     stdout=subprocess.PIPE)
     def make_turn(self, world):
         if self.proc.poll():
             raise Exception('Bot process terminated!')
 
-        self.proc.stdin.write(bytes(Bot.serialize_world_state(world), encoding='utf8'))
+        self.proc.stdin.write(bytes(world.serialize(), encoding='utf8'))
         self.proc.stdin.flush()
         turn = self.proc.stdout.readline().decode('utf8').split()
         cmd = turn[0]
@@ -168,16 +232,24 @@ class Bot:
         else:
             raise Exception('Unknown command: {}'.format(cmd))
 
-    def serialize_world_state(world):
-        return ('{} {}\n'.format(world.wolff.x, world.wolff.y)
-             + Bot.serialize_data_points(world) + Bot.serialize_enemies(world))
-    def serialize_data_points(world):
-        return '\n'.join([str(len(world.data_points))] + [' '.join((str(i), str(p.x), str(p.y))) for i, p in world.data_points.items()]) + '\n'
+def list_tests(test_set):
+    files = os.listdir(os.path.join(os.getcwd(), test_set))
+    files.sort()
+    res = [os.path.join(os.getcwd(), test_set, f) for f in files]
+    return res
 
-    def serialize_enemies(world):
-        return '\n'.join([str(len(world.enemies))] + [' '.join((str(i), str(e.x), str(e.y), str(e.life_points))) for i, e in world.enemies.items()]) + '\n'
-
-world = World(Bot('./bot'))
-while not world.game_over():
-    world.move()
-print('Game finished. Final score: {}'.format(world.score))
+if __name__ == '__main__':
+    if len(sys.argv) != 3:
+        print('Plese use the following format:')
+        print('./simulator.py TEST_SET BOT_PROGRAM')
+    else:
+        test_set = sys.argv[1]
+        bot_program = sys.argv[2]
+        tests = list_tests(test_set)
+        world = World(Bot(bot_program))
+        for test in tests:
+            with open(test) as f:
+                world.deserialize(f)
+            while not world.game_over():
+                world.move()
+            print('{:31} score: {}'.format(test.split('/')[-1], world.score))
