@@ -1,2 +1,5 @@
-bot
-*.cpp
+*
+!.gitignore
+!simulator.py
+!public_tests/
+!public_tests/*
