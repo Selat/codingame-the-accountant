@@ -247,9 +247,12 @@ if __name__ == '__main__':
         bot_program = sys.argv[2]
         tests = list_tests(test_set)
         world = World(Bot(bot_program))
+        scores_sum = 0
         for test in tests:
             with open(test) as f:
                 world.deserialize(f)
             while not world.game_over():
                 world.move()
+            scores_sum += world.score
             print('{:31} score: {}'.format(test.split('/')[-1], world.score))
+        print('Sum: {}'.format(scores_sum))
