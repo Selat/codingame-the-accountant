@@ -52,7 +52,6 @@ class Wolff(Unit):
     def shoot(self, world, target_id):
         enemy = world.enemies[target_id]
         dist = math.sqrt((self.x - enemy.x) * (self.x - enemy.x) + (self.y - enemy.y) * (self.y - enemy.y))
-        print(dist, dist**1.2)
         damage = round(125000 / (dist ** 1.2))
         enemy.damage(damage)
 
@@ -64,13 +63,15 @@ class DataPoint:
 class World:
     WIDTH = 16000
     HEIGHT = 9000
+    DATA_POINT_SCORE = 100
 
     def __init__(self, bot):
         self.bot = bot
         self.wolff = Wolff(1100, 1200)
+        # Test 29
         self.data_points = [DataPoint(5000, 5000), DataPoint(10000, 5000), DataPoint(5000, 1900), DataPoint(1000, 4000), DataPoint(1000, 8999)]
         self.enemies = [Enemy(10500, 8000, 10), Enemy(15000, 0, 42), Enemy(14000, 0, 42)]
-        self.score = len(self.data_points) * 100
+        self.score = len(self.data_points) * World.DATA_POINT_SCORE
         self.is_wolff_killed = False
         self.initial_live_points_sum = sum([e.life_points for e in self.enemies])
         self.shots_num = 0
@@ -104,7 +105,7 @@ class World:
         if not self.enemies:
             self.calculate_bonus()
 
-        print([(e.x, e.y, e.life_points) for e in self.enemies])
+        #print([(e.x, e.y, e.life_points) for e in self.enemies])
 
         # 6. Enemies collect data points they share coordinates with.
         self.collect_data_points()
@@ -133,7 +134,7 @@ class World:
             if not is_taken:
                 new_data_points.append(p)
             else:
-                self.score -= 100
+                self.score -= World.DATA_POINT_SCORE
         self.data_points = new_data_points
 
     def calculate_bonus(self):
@@ -142,8 +143,8 @@ class World:
 
 # Provides an interface for an actual bot written in C++.
 class Bot:
-    def __init__(self):
-        self.proc = subprocess.Popen('./bot', shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    def __init__(self, prog_name):
+        self.proc = subprocess.Popen(prog_name, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     def make_turn(self, world):
         if self.proc.poll():
             raise Exception('Bot process terminated!')
@@ -178,7 +179,7 @@ class Bot:
     def serialize_enemies(world):
         return '\n'.join([str(len(world.enemies))] + [' '.join((str(i), str(e.x), str(e.y), str(e.life_points))) for i, e in enumerate(world.enemies)]) + '\n'
 
-world = World(Bot())
+world = World(Bot('./bot'))
 while not world.game_over():
     world.move()
 print('Game finished. Final score: {}'.format(world.score))
