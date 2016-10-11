@@ -40,7 +40,6 @@ class Enemy(Unit):
                 min_dist = cur_dist
                 target = p
         Unit.move(self, target.x, target.y)
-        #time.sleep(1)
 
     def damage(self, damage):
         self.life_points = max(self.life_points - damage, 0)
@@ -113,7 +112,7 @@ class World:
         self.initial_life_points_sum = 0
         self.shots_num = 0
 
-    def move(self):
+    def step(self):
         self.cur_turn = self.bot.make_turn(self)
         # 1. Enemies move towards their targets.
         for e in self.enemies.values():
@@ -126,7 +125,6 @@ class World:
         # 3. Game over if an enemy is close enough to Wolff.
         self.check_wolff_killed()
         if self.is_wolff_killed:
-            self.is_wolff_killed = True
             self.score = 0
             return
 
@@ -242,7 +240,7 @@ def run_test(world, test_path):
     with open(test_path) as f:
         world.deserialize(f)
     while not world.game_over():
-        world.move()
+        world.step()
 
 def get_test_name(test_path):
     return os.path.split(test_path)[-1]
