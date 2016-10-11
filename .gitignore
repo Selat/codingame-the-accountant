@@ -1,6 +1,7 @@
 *
 !README.md
 !.gitignore
+!visualizer.py
 !simulator.py
 !public_tests/
 !public_tests/*

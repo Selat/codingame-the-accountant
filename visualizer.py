@@ -57,6 +57,14 @@ class GameVisualizer(QWidget):
 
     def drawWorld(self, event, qp):
         qp.setFont(QFont('Decorative', 20))
+        self.drawDataPoints(qp)
+        self.drawEnemies(qp)
+        self.drawWolff(qp)
+
+        center = QPoint(self.size().width() - 200, 50)
+        qp.drawText(center, 'Score: {}'.format(self.world.score))
+
+    def drawDataPoints(self, qp):
         for dp in self.world.data_points.values():
             qp.setBrush(Qt.green)
             x, y = self.convertCoordinates(dp.x, dp.y)
@@ -64,6 +72,7 @@ class GameVisualizer(QWidget):
             center = QPoint(x, y)
             qp.drawEllipse(center, r, r)
 
+    def drawEnemies(self, qp):
         for e in self.world.enemies.values():
             qp.setBrush(Qt.NoBrush)
             x, y = self.convertCoordinates(e.x, e.y)
@@ -79,24 +88,29 @@ class GameVisualizer(QWidget):
             qp.drawText(center, str(e.life_points))
             did = e.find_target_id(self.world)
             if did >= 0:
+                center = QPoint(x, y)
                 dp = self.world.data_points[did]
                 x, y = self.convertCoordinates(dp.x, dp.y)
                 dp_coord = QPoint(x, y)
                 qp.drawLine(center, dp_coord)
 
+    def drawWolff(self, qp):
         qp.setBrush(Qt.yellow)
         x, y = self.convertCoordinates(self.world.wolff.x, self.world.wolff.y)
         r = 50
         center = QPoint(x, y)
         qp.drawEllipse(center, r, r)
 
-        center = QPoint(self.size().width() - 200, 50)
-        qp.drawText(center, 'Score: {}'.format(self.world.score))
 
 def main():
+    if len(sys.argv) < 2:
+        print('Please use the following format:')
+        print('./visualizer TEST_FILE')
+        return
     app = QApplication(sys.argv)
+    test_path = sys.argv[1]
     world = simulator.World(simulator.Bot('./bot'))
-    with open('./public_tests/31_crackdown') as f:
+    with open(test_path) as f:
         world.deserialize(f)
     game_visualizer = GameVisualizer(world)
     sys.exit(app.exec_())
