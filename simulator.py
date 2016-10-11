@@ -238,7 +238,35 @@ def list_tests(test_set):
     res = [os.path.join(os.getcwd(), test_set, f) for f in files]
     return res
 
-if __name__ == '__main__':
+def run_test(world, test_path):
+    with open(test_path) as f:
+        world.deserialize(f)
+    while not world.game_over():
+        world.move()
+
+def get_test_name(test_path):
+    return os.path.split(test_path)[-1]
+
+def run_regression_tests():
+    expected_scores = (110, 220, 120, 120, 148, 311, 450, 60, 510, 90,
+                       406, 0, 220, 346, 770, 342, 0, 120, 120, 136,
+                       152, 0, 110, 110, 260, 60, 240, 320, 339, 160,
+                       0, 2220)
+    tests = list_tests('public_tests')
+    world = World(Bot('./paralyzed_wolff'))
+    all_tests_pass = True
+    for expected_score, test in zip(expected_scores, tests):
+        run_test(world, test)
+        if world.score != expected_score:
+            all_tests_pass = False
+            print('Test {} failed. Expected score {}, got {}'.format(
+                get_test_name(test), expected_score, world.score))
+            break
+    if all_tests_pass:
+        print('All tests passed successfully :)')
+
+def main():
+    #run_regression_tests()
     if len(sys.argv) != 3:
         print('Plese use the following format:')
         print('./simulator.py TEST_SET BOT_PROGRAM')
@@ -249,10 +277,11 @@ if __name__ == '__main__':
         world = World(Bot(bot_program))
         scores_sum = 0
         for test in tests:
-            with open(test) as f:
-                world.deserialize(f)
-            while not world.game_over():
-                world.move()
+            run_test(world, test)
             scores_sum += world.score
-            print('{:31} score: {}'.format(test.split('/')[-1], world.score))
+            print('{:31} score: {} {}'.format(get_test_name(test), world.score,
+                  '(killed)' if world.is_wolff_killed else ''))
         print('Sum: {}'.format(scores_sum))
+
+if __name__ == '__main__':
+    main()
