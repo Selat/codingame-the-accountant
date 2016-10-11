@@ -31,14 +31,20 @@ class Enemy(Unit):
         Unit.__init__(self, Enemy.SPEED)
         self.life_points = 0
 
-    def move(self, world):
+    def find_target_id(self, world):
+        target_id = -1
         min_dist = 10 ** 9
-        target = None
-        for p in world.data_points.values():
+        for id, p in world.data_points.items():
             cur_dist = (p.x - self.x) * (p.x - self.x) + (p.y - self.y) * (p.y - self.y)
             if cur_dist < min_dist:
                 min_dist = cur_dist
                 target = p
+                target_id = id
+        return target_id
+
+    def move(self, world):
+        tid = self.find_target_id(world)
+        target = world.data_points[tid]
         Unit.move(self, target.x, target.y)
 
     def damage(self, damage):
@@ -171,6 +177,17 @@ class World:
     def calculate_bonus(self):
         self.score += (len(self.data_points) *
             max(0, self.initial_life_points_sum - 3 * self.shots_num) * 3)
+
+    def serialize_step(self):
+        return '{} {} {}\n'.format(self.score, self.initial_life_points_sum,
+                                   self.shots_num)
+
+    def deserialize_step(self, s):
+        data = s.split(' ')
+        assert len(data) == 3
+        self.score = int(data[0])
+        self.initial_life_points_sum = int(data[1])
+        self.shots_num = int(data[2])
 
     def serialize(self):
         # World state should end with a newline, otherwise bot hangs
