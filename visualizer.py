@@ -62,7 +62,7 @@ class GameVisualizer(QWidget):
         self.drawWolff(qp)
 
         center = QPoint(self.size().width() - 200, 50)
-        qp.drawText(center, 'Score: {}'.format(self.world.score))
+        qp.drawText(center, 'Score: {}'.format(self.world.total_score()))
 
     def drawDataPoints(self, qp):
         for dp in self.world.data_points.values():

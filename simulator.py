@@ -116,6 +116,10 @@ class World:
         self.is_wolff_killed = False
         self.initial_life_points_sum = 0
         self.shots_num = 0
+        self.bonus = 0
+
+    def total_score(self):
+        return self.score + self.bonus
 
     def step(self):
         self.cur_turn = self.bot.make_turn(self)
@@ -174,19 +178,20 @@ class World:
         self.data_points = new_data_points
 
     def calculate_bonus(self):
-        self.score += (len(self.data_points) *
+        self.bonus = (len(self.data_points) *
             max(0, self.initial_life_points_sum - 3 * self.shots_num) * 3)
 
     def serialize_step(self):
-        return '{} {} {}\n'.format(self.score, self.initial_life_points_sum,
-                                   self.shots_num)
+        return '{} {} {} {}\n'.format(
+            self.score, self.bonus, self.initial_life_points_sum, self.shots_num)
 
     def deserialize_step(self, s):
         data = s.split(' ')
-        assert len(data) == 3
-        self.score = int(data[0])
-        self.initial_life_points_sum = int(data[1])
-        self.shots_num = int(data[2])
+        assert len(data) == 4
+        self.bonus = int(data[0])
+        self.score = int(data[1])
+        self.initial_life_points_sum = int(data[2])
+        self.shots_num = int(data[3])
 
     def serialize(self):
         # World state should end with a newline, otherwise bot hangs
@@ -273,10 +278,10 @@ def run_shoot_tests():
         world.bot = Bot('./paralyzed_wolff')
         run_test(world, test)
         world.bot.proc.terminate()
-        if world.score != expected_score:
+        if world.total_score() != expected_score:
             all_tests_pass = False
             print('Test {} failed. Expected score {}, got {}'.format(
-                get_test_name(test), expected_score, world.score))
+                get_test_name(test), expected_score, world.total_score()))
             break
     if all_tests_pass:
         print('All shooting tests passed successfully :)')
@@ -293,10 +298,10 @@ def run_move_tests():
         world.bot = Bot('./partially_paralyzed_wolff')
         run_test(world, test)
         world.bot.proc.terminate()
-        if world.score != expected_score:
+        if world.total_score() != expected_score:
             all_tests_pass = False
             print('Test {} failed. Expected score {}, got {}'.format(
-                get_test_name(test), expected_score, world.score))
+                get_test_name(test), expected_score, world.total_score()))
             break
     if all_tests_pass:
         print('All moving tests passed successfully :)')
@@ -318,8 +323,9 @@ def main():
             run_test(world, test)
             world.bot.proc.terminate()
             world.bot = None
-            scores_sum += world.score
-            print('{:31} score: {} {}'.format(get_test_name(test), world.score,
+            scores_sum += world.total_score()
+            print('{:31} score: {}, bonus: {} {}'.format(get_test_name(test),
+                  world.total_score(), world.bonus,
                   '(killed)' if world.is_wolff_killed else ''))
         print('Sum: {}'.format(scores_sum))
 
