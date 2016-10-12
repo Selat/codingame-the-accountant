@@ -310,7 +310,7 @@ def main():
     #run_shoot_tests()
     #run_move_tests()
     if len(sys.argv) != 3:
-        print('Plese use the following format:')
+        print('Please use the following format:')
         print('./simulator.py TEST_SET BOT_PROGRAM')
     else:
         test_set = sys.argv[1]
