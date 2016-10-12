@@ -257,7 +257,7 @@ int GetFinalScore(World& world) {
     if (world.wolff.pos.dist2(pos) <= ENEMY_RANGE * ENEMY_RANGE) {
       const auto& wolff = world.wolff;
       Vector2D target(wolff.pos.x + (wolff.pos.x - pos.x), wolff.pos.y + (wolff.pos.y - pos.y));
-      if (target.x < 0 || target.x >= 16000 || target.y < 0 || target.y >= 16000) {
+      if (target.x < 0 || target.x >= 16000 || target.y < 0 || target.y >= 9000) {
         world.wolff.shoot(world.FindNearestEnemy(world.wolff.pos));
       } else {
         world.wolff.move(target);
@@ -274,7 +274,10 @@ int GetBestMove(const World& world, Vector2D& pos, int depth = 0) {
   if (world.IsGameOver()) {
     return world.score;
   }
-  constexpr int kAngleStepsNum = 8;
+  int kAngleStepsNum = 16;
+  if (world.enemies.size() > 20) {
+    kAngleStepsNum = 4;
+  }
   int max_score = INT_MIN;
   for (int i = 0; i < kAngleStepsNum; ++i) {
     double angle = i * 2.0 * M_PI / kAngleStepsNum;
@@ -283,16 +286,17 @@ int GetBestMove(const World& world, Vector2D& pos, int depth = 0) {
     Vector2D next_pos = world.wolff.pos;
     next_pos.x += dx;
     next_pos.y += dy;
-    if (next_pos.x < 0 || next_pos.x >= 16000 || next_pos.y < 0 || next_pos.y >= 16000) {
+    if (next_pos.x < 0 || next_pos.x >= 16000 || next_pos.y < 0 || next_pos.y >= 9000) {
       continue;
     }
     World test_world = world;
     test_world.wolff.move(next_pos);
     test_world.step();
+    World test_world2 = test_world;
     int cur_score = GetFinalScore(test_world);
     if (depth == 0) {
       Vector2D tmp;
-      cur_score = std::max(GetBestMove(test_world, tmp, 1), cur_score);
+      cur_score = std::max(GetBestMove(test_world2, tmp, 1), cur_score);
     }
     if (cur_score > max_score) {
       max_score = cur_score;
