@@ -288,9 +288,6 @@ int GetBestMove(const World& world, Vector2D& pos, int depth = 0) {
     return world.score;
   }
   int kAngleStepsNum = 8;
-  if (world.enemies.size() > 20) {
-    kAngleStepsNum = 4;
-  }
   int max_score = INT_MIN;
   for (int i = 0; i < kAngleStepsNum; ++i) {
     double angle = i * 2.0 * M_PI / kAngleStepsNum;
@@ -307,7 +304,7 @@ int GetBestMove(const World& world, Vector2D& pos, int depth = 0) {
     test_world.step();
     World test_world2 = test_world;
     int cur_score = GetFinalScore(test_world);
-    if (depth == 0) {
+    if (depth == 0 && world.enemies.size() < 20) {
       Vector2D tmp;
       cur_score = std::max(GetBestMove(test_world2, tmp, 1), cur_score);
     }
