@@ -92,6 +92,14 @@ struct World {
   int FindNearestEnemy(const Vector2D& pos) const;
   bool IsGameOver() const;
   void CalculateBonus();
+  bool IsEnemyAlive(int id) const {
+    for (const auto& enemy : enemies) {
+      if (enemy.id == id) {
+        return true;
+      }
+    }
+    return false;
+  }
   Wolff wolff;
   std::list<Enemy> enemies;
   std::list<DataPoint> data_points;
@@ -274,7 +282,7 @@ int GetBestMove(const World& world, Vector2D& pos, int depth = 0) {
   if (world.IsGameOver()) {
     return world.score;
   }
-  int kAngleStepsNum = 16;
+  int kAngleStepsNum = 8;
   if (world.enemies.size() > 20) {
     kAngleStepsNum = 4;
   }
@@ -309,11 +317,14 @@ int GetBestMove(const World& world, Vector2D& pos, int depth = 0) {
 int GetBestShoot(const World& world, int& id) {
   World test_world = world;
   id = world.FindNearestEnemy(world.wolff.pos);
-  return GetFinalScore(test_world);
-  int max_score = -1;
+  int max_score = GetFinalScore(test_world);
+  if (world.enemies.size() > 20) return max_score;
   for (const auto& enemy : world.enemies) {
     World test_world = world;
-    test_world.wolff.shoot(enemy.id);
+    while (!test_world.IsGameOver() && test_world.IsEnemyAlive(enemy.id)) {
+      test_world.wolff.shoot(enemy.id);
+      test_world.step();
+    }
     int cur_score = GetFinalScore(test_world);
     if (cur_score > max_score) {
       max_score = cur_score;
@@ -381,8 +392,6 @@ int main() {
       } else {
         std::cout << "SHOOT " << best_target << std::endl;
       }
-      //int tid = world.FindNearestEnemy(world.wolff.pos);
-      //std::cout << "SHOOT " << tid << std::endl;
     }
   }
 }
