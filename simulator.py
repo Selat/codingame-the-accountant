@@ -20,9 +20,8 @@ class Unit:
             d = math.sqrt(d)
             dx = x - self.x
             dy = y - self.y
-            c = self.SPEED / d
-            self.x += math.floor(dx * c)
-            self.y += math.floor(dy * c)
+            self.x += math.floor(dx * self.SPEED / d)
+            self.y += math.floor(dy * self.SPEED / d)
 
 class Enemy(Unit):
     SPEED = 500
@@ -236,7 +235,7 @@ class Bot:
             y = int(turn[2])
             assert 0 <= x < world.WIDTH and 0 <= y < world.HEIGHT
             turn[1] = x
-            turn[2] = x
+            turn[2] = y
             return turn
         elif cmd == 'SHOOT':
             assert len(turn) == 2
@@ -262,26 +261,49 @@ def run_test(world, test_path):
 def get_test_name(test_path):
     return os.path.split(test_path)[-1]
 
-def run_regression_tests():
+def run_shoot_tests():
     expected_scores = (110, 220, 120, 120, 148, 311, 450, 60, 510, 90,
                        406, 0, 220, 346, 770, 342, 0, 120, 120, 136,
                        152, 0, 110, 110, 260, 60, 240, 320, 339, 160,
                        0, 2220)
     tests = list_tests('public_tests')
-    world = World(Bot('./paralyzed_wolff'))
+    world = World(None)
     all_tests_pass = True
     for expected_score, test in zip(expected_scores, tests):
+        world.bot = Bot('./paralyzed_wolff')
         run_test(world, test)
+        world.bot.proc.terminate()
         if world.score != expected_score:
             all_tests_pass = False
             print('Test {} failed. Expected score {}, got {}'.format(
                 get_test_name(test), expected_score, world.score))
             break
     if all_tests_pass:
-        print('All tests passed successfully :)')
+        print('All shooting tests passed successfully :)')
+
+def run_move_tests():
+    expected_scores = (113, 126, 144, 144, 0, 20, 0, 0, 0, 0,
+                       0, 0, 126, 0, 200, 20, 0, 120, 144, 163,
+                       0, 0, 310, 310, 0, 0, 140, 620, 874, 0,
+                       0, 0)
+    tests = list_tests('public_tests')
+    world = World(None)
+    all_tests_pass = True
+    for expected_score, test in zip(expected_scores, tests):
+        world.bot = Bot('./partially_paralyzed_wolff')
+        run_test(world, test)
+        world.bot.proc.terminate()
+        if world.score != expected_score:
+            all_tests_pass = False
+            print('Test {} failed. Expected score {}, got {}'.format(
+                get_test_name(test), expected_score, world.score))
+            break
+    if all_tests_pass:
+        print('All moving tests passed successfully :)')
 
 def main():
-    #run_regression_tests()
+    #run_shoot_tests()
+    #run_move_tests()
     if len(sys.argv) != 3:
         print('Plese use the following format:')
         print('./simulator.py TEST_SET BOT_PROGRAM')
@@ -289,10 +311,13 @@ def main():
         test_set = sys.argv[1]
         bot_program = sys.argv[2]
         tests = list_tests(test_set)
-        world = World(Bot(bot_program))
+        world = World(None)
         scores_sum = 0
         for test in tests:
+            world.bot = Bot(bot_program)
             run_test(world, test)
+            world.bot.proc.terminate()
+            world.bot = None
             scores_sum += world.score
             print('{:31} score: {} {}'.format(get_test_name(test), world.score,
                   '(killed)' if world.is_wolff_killed else ''))
