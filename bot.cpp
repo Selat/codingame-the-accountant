@@ -90,7 +90,7 @@ struct World {
   void step();
   int FindNearestDataPoint(const Vector2D& pos);
   int FindNearestEnemy(const Vector2D& pos);
-  bool IsGameOver();
+  bool IsGameOver() const;
   void CalculateBonus();
   Wolff wolff;
   std::list<Enemy> enemies;
@@ -218,10 +218,11 @@ int World::FindNearestEnemy(const Vector2D& pos) {
       min_it = it;
     }
   }
+  assert(min_it != enemies.end());
   return min_it->id;
 }
 
-bool World::IsGameOver() {
+bool World::IsGameOver() const {
   return enemies.empty() || data_points.empty() || is_wolff_killed;
 }
 
@@ -239,47 +240,87 @@ void World::Init() {
   score = data_points.size() * 100;
 }
 
+Vector2D GetDangerousEnemyPos(const World& world) {
+  Vector2D pos = world.enemies.front().pos;
+  for (auto enemy : world.enemies) {
+    enemy.move(world);
+    if (world.wolff.pos.dist2(enemy.pos) < world.wolff.pos.dist2(pos)) {
+      pos = enemy.pos;
+    }
+  }
+  return pos;
+}
+
+int GetFinalScore(World& world) {
+  while (!world.IsGameOver()) {
+    Vector2D pos = GetDangerousEnemyPos(world);
+    if (world.wolff.pos.dist2(pos) <= ENEMY_RANGE * ENEMY_RANGE) {
+      const auto& wolff = world.wolff;
+      Vector2D target(wolff.pos.x + (wolff.pos.x - pos.x), wolff.pos.y + (wolff.pos.y - pos.y));
+      if (target.x < 0 || target.x >= 16000 || target.y < 0 || target.y >= 16000) {
+        world.wolff.shoot(world.FindNearestEnemy(world.wolff.pos));
+      } else {
+        world.wolff.move(target);
+      }
+    } else {
+      world.wolff.shoot(world.FindNearestEnemy(world.wolff.pos));
+    }
+    world.step();
+  }
+  return world.score;
+}
+
+int GetBestMove(const World& world, Vector2D& pos, int depth = 0) {
+  if (world.IsGameOver()) {
+    return world.score;
+  }
+  constexpr int kAngleStepsNum = 8;
+  int max_score = INT_MIN;
+  for (int i = 0; i < kAngleStepsNum; ++i) {
+    double angle = i * 2.0 * M_PI / kAngleStepsNum;
+    double dx = 1000.0 * cos(angle);
+    double dy = 1000.0 * sin(angle);
+    Vector2D next_pos = world.wolff.pos;
+    next_pos.x += dx;
+    next_pos.y += dy;
+    if (next_pos.x < 0 || next_pos.x >= 16000 || next_pos.y < 0 || next_pos.y >= 16000) {
+      continue;
+    }
+    World test_world = world;
+    test_world.wolff.move(next_pos);
+    test_world.step();
+    int cur_score = GetFinalScore(test_world);
+    if (depth == 0) {
+      Vector2D tmp;
+      cur_score = std::max(GetBestMove(test_world, tmp, 1), cur_score);
+    }
+    if (cur_score > max_score) {
+      max_score = cur_score;
+      pos = next_pos;
+    }
+  }
+  return max_score;
+}
+
 int main() {
-  int it_id = 0;
-  World world;
   while (true) {
-    ++it_id;
     int x;
     int y;
     std::cin >> x >> y; std::cin.ignore();
-    if (it_id < 0) {
-      assert(world.wolff.pos.x == x);
-      assert(world.wolff.pos.y == y);
-    } else {
-      world.wolff.pos.x = x;
-      world.wolff.pos.y = y;
-    }
+    World world;
+    world.wolff.pos.x = x;
+    world.wolff.pos.y = y;
     int dataCount;
     std::cin >> dataCount; std::cin.ignore();
-    if (it_id < 0) {
-      assert(world.data_points.size() == dataCount);
-    }
     for (int i = 0; i < dataCount; i++) {
       int dataId;
       int dataX;
       int dataY;
       std::cin >> dataId >> dataX >> dataY; std::cin.ignore();
-      if (it_id < 0) {
-        for (const auto& dp : world.data_points) {
-          if (dp.id == dataId) {
-            assert(dp.pos.x == dataX);
-            assert(dp.pos.y == dataY);
-          }
-        }
-      } else {
-        world.data_points.push_back(DataPoint(dataId, dataX, dataY));
-      }
+      world.data_points.push_back(DataPoint(dataId, dataX, dataY));
     }
     int enemyCount;
     std::cin >> enemyCount; std::cin.ignore();
-    if (it_id < 0) {
-      assert(world.enemies.size() == enemyCount);
-    }
     int min_dist = INT_MAX;
     int min_id = -1;
     for (int i = 0; i < enemyCount; i++) {
@@ -288,17 +329,7 @@ int main() {
       int enemyY;
       int enemyLife;
       std::cin >> enemyId >> enemyX >> enemyY >> enemyLife; std::cin.ignore();
-      if (it_id < 0) {
-        for (const auto& enemy : world.enemies) {
-          if (enemy.id == enemyId) {
-            assert(enemy.pos.x == enemyX);
-            assert(enemy.pos.y == enemyY);
-            assert(enemy.life_points == enemyLife);
-          }
-        }
-      } else {
-        world.enemies.push_back(Enemy(enemyId, enemyX, enemyY, enemyLife));
-      }
+      world.enemies.push_back(Enemy(enemyId, enemyX, enemyY, enemyLife));
       int d = (x - enemyX) * (x - enemyX) + (y - enemyY) * (y - enemyY);
       if (d < min_dist) {
         min_dist = d;
@@ -306,27 +337,30 @@ int main() {
       }
     }
 
-    if (it_id == 1) {
-      auto start = std::chrono::high_resolution_clock::now();
-      world.Init();
-      int tid = 0;
-      while (!world.IsGameOver()) {
-        ++tid;
-        if (tid < 5) {
-          world.wolff.move(Vector2D(8000, 4000));
-        } else {
-          world.wolff.shoot(world.FindNearestEnemy(world.wolff.pos));
-        }
-        world.step();
-      }
-      auto end = std::chrono::high_resolution_clock::now();
-      std::cerr << world.score << " " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << std::endl;
-    }
+    world.Init();
 
-    if (it_id < 5) {
-      std::cout << "MOVE 8000 4000" << std::endl;
+    auto start = std::chrono::high_resolution_clock::now();
+    Vector2D best_move;
+    int move_score = GetBestMove(world, best_move);
+    World test_world = world;
+    int shoot_score = GetFinalScore(test_world);
+    auto end = std::chrono::high_resolution_clock::now();
+    //std::cerr << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << std::endl;
+
+    //std::cerr << move_score << " " << shoot_score << std::endl;
+    if (move_score > shoot_score) {
+      std::cout << "MOVE " << best_move.x << " " << best_move.y << std::endl;
     } else {
-      std::cout << "SHOOT " << min_id << std::endl;
+      Vector2D pos = GetDangerousEnemyPos(world);
+      if (world.wolff.pos.dist2(pos) <= ENEMY_RANGE * ENEMY_RANGE) {
+        const auto& wolff = world.wolff;
+        Vector2D target(wolff.pos.x + (wolff.pos.x - pos.x), wolff.pos.y + (wolff.pos.y - pos.y));
+        std::cout << "MOVE " << target.x << " " << target.y << std::endl;
+      } else {
+        std::cout << "SHOOT " << world.FindNearestEnemy(world.wolff.pos) << std::endl;
+      }
+      //int tid = world.FindNearestEnemy(world.wolff.pos);
+      //std::cout << "SHOOT " << tid << std::endl;
     }
   }
 }
