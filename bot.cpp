@@ -89,7 +89,7 @@ struct World {
   void Init();
   void step();
   int FindNearestDataPoint(const Vector2D& pos);
-  int FindNearestEnemy(const Vector2D& pos);
+  int FindNearestEnemy(const Vector2D& pos) const;
   bool IsGameOver() const;
   void CalculateBonus();
   Wolff wolff;
@@ -208,7 +208,7 @@ int World::FindNearestDataPoint(const Vector2D& pos) {
   return min_it->id;
 }
 
-int World::FindNearestEnemy(const Vector2D& pos) {
+int World::FindNearestEnemy(const Vector2D& pos) const {
   auto min_it = enemies.begin();
   int min_dist = INT_MAX;
   for (auto it = enemies.begin(); it != enemies.end(); ++it) {
@@ -306,6 +306,23 @@ int GetBestMove(const World& world, Vector2D& pos, int depth = 0) {
   return max_score;
 }
 
+int GetBestShoot(const World& world, int& id) {
+  World test_world = world;
+  id = world.FindNearestEnemy(world.wolff.pos);
+  return GetFinalScore(test_world);
+  int max_score = -1;
+  for (const auto& enemy : world.enemies) {
+    World test_world = world;
+    test_world.wolff.shoot(enemy.id);
+    int cur_score = GetFinalScore(test_world);
+    if (cur_score > max_score) {
+      max_score = cur_score;
+      id = enemy.id;
+    }
+  }
+  return max_score;
+}
+
 int main() {
   while (true) {
     int x;
@@ -347,7 +364,8 @@ int main() {
     Vector2D best_move;
     int move_score = GetBestMove(world, best_move);
     World test_world = world;
-    int shoot_score = GetFinalScore(test_world);
+    int best_target = -1;
+    int shoot_score = GetBestShoot(test_world, best_target);
     auto end = std::chrono::high_resolution_clock::now();
     //std::cerr << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << std::endl;
 
@@ -361,7 +379,7 @@ int main() {
         Vector2D target(wolff.pos.x + (wolff.pos.x - pos.x), wolff.pos.y + (wolff.pos.y - pos.y));
         std::cout << "MOVE " << target.x << " " << target.y << std::endl;
       } else {
-        std::cout << "SHOOT " << world.FindNearestEnemy(world.wolff.pos) << std::endl;
+        std::cout << "SHOOT " << best_target << std::endl;
       }
       //int tid = world.FindNearestEnemy(world.wolff.pos);
       //std::cout << "SHOOT " << tid << std::endl;
