@@ -8,7 +8,14 @@
 #include <cassert>
 #include <chrono>
 
-constexpr int ENEMY_RANGE = 2000;
+constexpr int kEnemyRange = 2000;
+
+struct Enemy;
+struct DataPoint;
+struct Wolff;
+struct World;
+struct Vector2D;
+std::ostream& operator<<(std::ostream& out, const Vector2D& v);
 
 struct Vector2D {
   Vector2D() {}
@@ -71,8 +78,6 @@ struct Wolff {
   int action;
   Vector2D target_pos;
 };
-
-struct World;
 
 struct Enemy {
   Enemy();
@@ -147,7 +152,7 @@ void World::step() {
 
   // 3. Game over if an enemy is close enough to Wolff.
   for (const auto& enemy : enemies) {
-    if (wolff.pos.dist2(enemy.pos) <= ENEMY_RANGE * ENEMY_RANGE) {
+    if (wolff.pos.dist2(enemy.pos) <= kEnemyRange * kEnemyRange) {
       is_wolff_killed = true;
       break;
     }
@@ -262,7 +267,7 @@ Vector2D GetDangerousEnemyPos(const World& world) {
 int GetFinalScore(World& world) {
   while (!world.IsGameOver()) {
     Vector2D pos = GetDangerousEnemyPos(world);
-    if (world.wolff.pos.dist2(pos) <= ENEMY_RANGE * ENEMY_RANGE) {
+    if (world.wolff.pos.dist2(pos) <= kEnemyRange * kEnemyRange) {
       const auto& wolff = world.wolff;
       Vector2D target(wolff.pos.x + (wolff.pos.x - pos.x), wolff.pos.y + (wolff.pos.y - pos.y));
       if (target.x < 0 || target.x >= 16000 || target.y < 0 || target.y >= 9000) {
@@ -385,7 +390,7 @@ int main() {
       std::cout << "MOVE " << best_move.x << " " << best_move.y << std::endl;
     } else {
       Vector2D pos = GetDangerousEnemyPos(world);
-      if (world.wolff.pos.dist2(pos) <= ENEMY_RANGE * ENEMY_RANGE) {
+      if (world.wolff.pos.dist2(pos) <= kEnemyRange * kEnemyRange) {
         const auto& wolff = world.wolff;
         Vector2D target(wolff.pos.x + (wolff.pos.x - pos.x), wolff.pos.y + (wolff.pos.y - pos.y));
         std::cout << "MOVE " << target.x << " " << target.y << std::endl;
