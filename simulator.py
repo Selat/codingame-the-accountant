@@ -318,16 +318,22 @@ def main():
         tests = list_tests(test_set)
         world = World(None)
         scores_sum = 0
+        positive_bonus_num = 0
+        bonuses_sum = 0
         for test in tests:
             world.bot = Bot(bot_program)
             run_test(world, test)
             world.bot.proc.terminate()
             world.bot = None
             scores_sum += world.total_score()
+            bonuses_sum += world.bonus
+            if world.bonus > 0:
+                positive_bonus_num += 1
             print('{:31} score: {}, bonus: {} {}'.format(get_test_name(test),
                   world.total_score(), world.bonus,
                   '(killed)' if world.is_wolff_killed else ''))
-        print('Sum: {}'.format(scores_sum))
+        print('Sum: {}, Bonus: {} ({:0.4}%)'.format(scores_sum, bonuses_sum, bonuses_sum / scores_sum * 100))
+        print('Positive bonus: {:0.4}%'.format(positive_bonus_num / len(tests) * 100))
 
 if __name__ == '__main__':
     main()
