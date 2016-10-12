@@ -58,8 +58,8 @@ class GameVisualizer(QWidget):
     def drawWorld(self, event, qp):
         qp.setFont(QFont('Decorative', 20))
         self.drawDataPoints(qp)
-        self.drawEnemies(qp)
         self.drawWolff(qp)
+        self.drawEnemies(qp)
 
         center = QPoint(self.size().width() - 200, 50)
         qp.drawText(center, 'Score: {}'.format(self.world.total_score()))
@@ -103,13 +103,14 @@ class GameVisualizer(QWidget):
 
 
 def main():
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 3:
         print('Please use the following format:')
-        print('./visualizer TEST_FILE')
+        print('./visualizer TEST_FILE BOT_PROGRAM')
         return
     app = QApplication(sys.argv)
     test_path = sys.argv[1]
-    world = simulator.World(simulator.Bot('./bot'))
+    bot_program = sys.argv[2]
+    world = simulator.World(simulator.Bot(bot_program))
     with open(test_path) as f:
         world.deserialize(f)
     game_visualizer = GameVisualizer(world)
