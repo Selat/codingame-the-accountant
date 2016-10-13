@@ -12,7 +12,7 @@
 
 constexpr int kGenomeSize = 3;
 constexpr int kMovesNum = 8;
-constexpr int kPopulationSize = 100;
+constexpr int kPopulationSize = 5;
 constexpr double kMutationPercentage = 0.2;
 constexpr double kRecombinationsPercentage = 1.0;
 
@@ -28,6 +28,7 @@ Vector2D GetDangerousEnemyPos(const World& world) {
 }
 
 int GetFinalScore(World& world) {
+  int fine = 0;
   while (!world.IsGameOver()) {
     Vector2D pos = GetDangerousEnemyPos(world);
     if (world.wolff.pos.dist2(pos) <= kEnemyRange * kEnemyRange) {
@@ -42,8 +43,9 @@ int GetFinalScore(World& world) {
       world.wolff.shoot(world.FindNearestEnemy(world.wolff.pos));
     }
     world.step();
+    //fine += 10;
   }
-  return world.score;
+  return world.score - fine;
 }
 
 Vector2D ConvertMove(const Vector2D& pos, int move_id) {
@@ -57,8 +59,11 @@ Vector2D ConvertMove(const Vector2D& pos, int move_id) {
 }
 
 struct GameMove {
+  GameMove() : type(MOVE), target_id(0), move_id(0) {
+  }
   void GenerateRandom(const World& world) {
-    int id = (rand() % kMovesNum);//+ world.enemies.size()));
+    int id = 1;//(rand() % kMovesNum);//+ world.enemies.size()));
+    //std::cerr << id << std::endl;
     if (id < kMovesNum) {
       type = MOVE;
       move_id = id;
@@ -78,17 +83,14 @@ struct GameMove {
     world.step();
   }
   enum Type {MOVE, SHOOT} type;
-  union {
-    int target_id;
-    int move_id;
-  };
+  int target_id;
+  int move_id;
 };
 
 struct Genome {
-  Genome() {
-
+  Genome() : score(0) {
   }
-  Genome(const World& world) : score(0) {
+  void GenerateRandom(const World& world) {
     for (auto& move : moves) {
       move.GenerateRandom(world);
     }
@@ -107,6 +109,7 @@ struct Genome {
   }
   void Mutate(const World& world) {
     moves[rand() % moves.size()].GenerateRandom(world);
+    //moves[rand() % kGenomeSize].GenerateRandom(world, 1);
   }
   int Score() const {
     return score;
@@ -121,7 +124,9 @@ struct Genome {
 struct Population {
   Population(const World& world) {
     for (int i = 0; i < kPopulationSize; ++i) {
-      genomes.push_back(Genome(world));
+      auto genome = Genome();
+      genome.GenerateRandom(world);
+      genomes.push_back(std::move(genome));
     }
     for (int i = 0; i < kPopulationSize; ++i) {
       genomes[i].Rescore(world);
@@ -163,7 +168,7 @@ struct Population {
 };
 
 int main() {
-  //srand(0);
+  srand(42);
   while (true) {
     int x;
     int y;
@@ -205,15 +210,18 @@ int main() {
     auto start = std::chrono::high_resolution_clock::now();
     Population population(world);
     auto end = std::chrono::high_resolution_clock::now();
+    int pid = 0;
     while (std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() < 80) {
       population.GenerateNext(world);
       end = std::chrono::high_resolution_clock::now();
+      ++pid;
     }
     int ga_score;
     GameMove best_move = population.GetBestMove(ga_score);
     World test_world;
     int stand_score = GetFinalScore(test_world);
     if (ga_score > stand_score) {
+      //std::cerr << "ok! " << best_move.move_id << std::endl;
       if (best_move.type == GameMove::SHOOT) {
         int id = 0;
         best_move.target_id %= world.enemies.size();
@@ -225,10 +233,25 @@ int main() {
         }
       } else {
         auto move = ConvertMove(world.wolff.pos, best_move.move_id);
-        std::cout << "MOVE " << move.x << " " << move.y << std::endl;
+        if (move.x < 0 || move.x >= 16000 || move.y < 0 || move.y >= 9000) {
+          std::cout << "SHOOT " << world.FindNearestEnemy(world.wolff.pos) << std::endl;
+        } else {
+          std::cout << "MOVE " << move.x << " " << move.y << std::endl;
+        }
       }
     } else {
-      std::cout << "SHOOT " << world.FindNearestEnemy(world.wolff.pos) << std::endl;
+      Vector2D pos = GetDangerousEnemyPos(world);
+      if (world.wolff.pos.dist2(pos) <= kEnemyRange * kEnemyRange) {
+        const auto& wolff = world.wolff;
+        Vector2D target(wolff.pos.x + (wolff.pos.x - pos.x), wolff.pos.y + (wolff.pos.y - pos.y));
+        if (target.x < 0 || target.x >= 16000 || target.y < 0 || target.y >= 9000) {
+          std::cout << "SHOOT " << world.FindNearestEnemy(world.wolff.pos) << std::endl;
+        } else {
+          std::cout << "MOVE " << target.x << " " << target.y << std::endl;
+        }
+      } else {
+        std::cout << "SHOOT " << world.FindNearestEnemy(world.wolff.pos) << std::endl;
+      }
     }
   }
 }
