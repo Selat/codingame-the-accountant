@@ -1,4 +1,5 @@
 *
+!*.hpp
 !*.cpp
 !README.md
 !.gitignore
