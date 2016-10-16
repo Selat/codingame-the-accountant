@@ -10,10 +10,10 @@
 
 #include "world.hpp"
 
-constexpr int kGenomeSize = 3;
-constexpr int kMovesNum = 8;
-constexpr int kPopulationSize = 5;
-constexpr double kMutationPercentage = 0.2;
+constexpr int kGenomeSize = 1;
+constexpr int kMovesNum = 4;
+constexpr int kPopulationSize = 100;
+constexpr double kMutationPercentage = 1.0;
 constexpr double kRecombinationsPercentage = 1.0;
 
 Vector2D GetDangerousEnemyPos(const World& world) {
@@ -62,7 +62,7 @@ struct GameMove {
   GameMove() : type(MOVE), target_id(0), move_id(0) {
   }
   void GenerateRandom(const World& world) {
-    int id = 1;//(rand() % kMovesNum);//+ world.enemies.size()));
+    int id = (rand() % (kMovesNum + 1));//+ world.enemies.size()));
     //std::cerr << id << std::endl;
     if (id < kMovesNum) {
       type = MOVE;
@@ -77,10 +77,12 @@ struct GameMove {
     if (type == MOVE) {
       Vector2D next_pos = ConvertMove(world.wolff.pos, move_id);
       world.wolff.move(next_pos);
+      world.step();
     } else {
-      world.wolff.shoot(target_id);
+      GetFinalScore(world);
+      //world.wolff.shoot(target_id);
     }
-    world.step();
+    //world.step();
   }
   enum Type {MOVE, SHOOT} type;
   int target_id;
@@ -103,6 +105,7 @@ struct Genome {
   }
   void Rescore(World world) {
     for (const auto& move : moves) {
+      if (world.IsGameOver()) break;
       move.Apply(world);
     }
     score = GetFinalScore(world);
@@ -135,7 +138,7 @@ struct Population {
   void GenerateNext(const World& world) {
     int n = genomes.size();
     int mutants_num = genomes.size() * kMutationPercentage;
-    int recombinations_num = 0;//n * kRecombinationsPercentage;
+    int recombinations_num = n * kRecombinationsPercentage;
     for (int i = 0; i < mutants_num; ++i) {
       Genome new_genome = genomes[rand() % n];
       new_genome.Mutate(world);
@@ -143,8 +146,8 @@ struct Population {
       genomes.push_back(std::move(new_genome));
     }
     for (int i = 0; i < recombinations_num; ++i) {
-      Genome new_genome = genomes[rand() % n];
-      new_genome.Recombine(genomes[rand() % n]);
+      Genome new_genome = genomes[rand() % (n / 2)];
+      new_genome.Recombine(genomes[(rand() % (n / 2))+ n / 2]);
       new_genome.Rescore(world);
       genomes.push_back(std::move(new_genome));
     }
@@ -211,7 +214,7 @@ int main() {
     Population population(world);
     auto end = std::chrono::high_resolution_clock::now();
     int pid = 0;
-    while (std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() < 80) {
+    while (std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() < 80 && pid < 1000) {
       population.GenerateNext(world);
       end = std::chrono::high_resolution_clock::now();
       ++pid;
